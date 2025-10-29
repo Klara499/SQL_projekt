@@ -1,0 +1,44 @@
+-- 01_primary_final.sql
+-- Vytvoření finální tabulky t_klara_klimova_project_SQL_primary_final
+-- Obsah: průměrné mzdy v ČR a průměrné ceny potravin v jednotlivých letech
+
+-- 1) průměrná mzda za rok v ČR
+CREATE OR REPLACE VIEW v_klara_klimova_payroll_year AS
+SELECT
+    payroll_year AS year,
+    ROUND(AVG(value), 2) AS avg_salary_overall
+FROM czechia_payroll
+WHERE calculation_code = 100      -- průměr
+  AND value_type_code = 5958      -- přepočtený počet zaměstnanců
+GROUP BY payroll_year;
+
+-- 2) průměrná cena potravin za rok a kategorii
+CREATE OR REPLACE VIEW v_klara_klimova_food_price_year AS
+SELECT
+    EXTRACT(YEAR FROM date_from) AS year,
+    category_code,
+    ROUND(AVG(value)::numeric, 2) AS avg_price_item
+FROM czechia_price
+GROUP BY EXTRACT(YEAR FROM date_from), category_code;
+
+-- 3) doplnění názvu potraviny
+CREATE OR REPLACE VIEW v_klara_klimova_food_price_year_named AS
+SELECT
+    p.year,
+    c.name AS food_name,
+    p.category_code,
+    p.avg_price_item
+FROM v_klara_klimova_food_price_year p
+JOIN czechia_price_category c 
+    ON p.category_code = c.code;
+
+-- 4) finální tabulka pro ČR (mzda + ceny potravin v daném roce)
+CREATE TABLE t_klara_klimova_project_SQL_primary_final AS
+SELECT
+    f.year,
+    s.avg_salary_overall,
+    f.food_name,
+    f.avg_price_item
+FROM v_klara_klimova_food_price_year_named f
+JOIN v_klara_klimova_payroll_year s
+    ON f.year = s.year;
